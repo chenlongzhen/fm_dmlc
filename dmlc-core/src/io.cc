@@ -31,7 +31,7 @@ FileSystem *FileSystem::GetInstance(const std::string &protocol) {
   if (protocol == "file://" || protocol.length() == 0) {
     return LocalFileSystem::GetInstance();
   }
-  if (protocol == "hdfs://") {
+  if (protocol == "hdfs://" ||  protocol == "viewfs://") {
 #if DMLC_USE_HDFS
     return HDFSFileSystem::GetInstance();
 #else
