@@ -1,33 +1,6 @@
-# Distributed FM and LR based on Rabit
-
-[![GitHub license](http://dmlc.github.io/img/apache2.svg)](./LICENSE)
-
-Portable, scalable and reliable distributed machine learning.
-
-Wormhole is a place where DMLC projects works together to provide
-scalable and reliable machine learning toolkits that can run on various platforms
-
-Since wormhole has been Deprecated, we retain some useful tools and keep updating
-
-Features
-====
-* Portable:
-  - Supported platforms: local machine, Apache YARN, MPI and Sungrid Engine
-* Rich support of Data Source
-  - All projects can read data from HDFS, S3 or local filesystem
-* Scalable and Reliable
-
-List of Tools
-====
-* Linear method: [L-BFGS](learn/lbfgs-linear)
-* Factorization Machine based on Rabit: [FM](learn/lbfgs-fm)
-
-Build & Run
-====
-
-* Requires a C++11 compiler (e.g.~`g++ >=4.8`) and `git`. Install them on Ubuntu >= 13.10
-
-* `cd dmlc-core; make` to make dmlc core  
-  `cd rabit; make` to make rabit  
-  `cd src/lbfgs-linear; make` or `cd src/lbfgs-fm; make`
-
+#DMLC-FM ON yarn (viewfs)
+原项目来自：https://github.com/CNevd/FM_DMLC 但不支持viewfs
+1. 修改Client.java 中校验hdfs://,将java申请的内存提高到4g
+2. io hdfs 等cc文件 添加views校验
+3. 重新编译 dmlccore rabit java 等
+4. 增加viewfs demo
