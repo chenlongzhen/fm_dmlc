@@ -287,8 +287,8 @@ public class Client {
 
         // Set up resource type requirements for ApplicationMaster
         Resource capability = Records.newRecord(Resource.class);
-        capability.setMemory(1024);
-        capability.setVirtualCores(1);
+        capability.setMemory(4096);
+        capability.setVirtualCores(2);
         LOG.info("jobname=" + this.jobName + ",username=" + this.userName);
         
         appContext.setApplicationName(jobName + ":DMLC-YARN");
