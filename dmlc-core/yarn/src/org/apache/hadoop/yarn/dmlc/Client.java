@@ -137,7 +137,7 @@ public class Client {
             // copy local data to temporary folder in HDFS
             if (!e.getValue().startsWith("hdfs://") && !e.getValue().startsWith("viewfs://")) {
 				// chenlongzhen
-				LOG.info("if you use hdfs or view fs data.you must start with hdfs:// or viewfs://");
+				//LOG.info("if you use hdfs or view fs data.you must start with hdfs:// or viewfs://");
 				String fsDefaultName = conf.get(FileSystem.FS_DEFAULT_NAME_KEY);
 				Path dst = new Path(fsDefaultName + tmpPath + "/"+ path.getName());
 				//end
