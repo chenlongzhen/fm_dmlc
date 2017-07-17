@@ -49,6 +49,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     name_dump = "dump.txt";
     model_out = "final.model";
   }
+  //destructor
   virtual ~FmObjFunction(void) {
     if (dtrain != NULL)
       delete dtrain;
@@ -76,6 +77,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     if (!strcmp(name, "data")) data = val;
     if (!strcmp(name, "val_data")) val_data = val;
   }
+  //run
   inline void Run(void) {
     if (data != "NULL") {
       dtrain = dmlc::RowBlockIter<unsigned>::Create
@@ -95,6 +97,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
       lbfgs.Run();
       if (rabit::GetRank() == 0) {
         this->SaveModel(model_out.c_str(), lbfgs.GetWeight());
+        this->SaveModelWeight(lbfgs.GetWeight(), 0);
       }
     } else if (task == "pred") {
       this->TaskPred();
@@ -104,6 +107,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
       LOG(FATAL) << "unknown task" << task;
     }
   }
+  //predict task
   inline void TaskPred(void) {
     CHECK(model_in != "NULL") << "must set model_in for task=pred";
     dmlc::Stream *fo = dmlc::Stream::Create(name_pred.c_str(), "w");
@@ -120,6 +124,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     delete fo;
     printf("Finishing writing to %s\n", name_pred.c_str());
   }
+  //dump task, dump weight nice mode 
   inline void TaskDump(void) {
     CHECK(model_in != "NULL") << "must set model_in for task=dump";
     dmlc::Stream *fo = dmlc::Stream::Create(name_dump.c_str(), "w");
@@ -136,6 +141,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     delete fo;
     printf("Finishing dumping to %s\n", name_dump.c_str());
   }
+  // set validation 
   inline void InitValidation(void){
     dval = dmlc::RowBlockIter<unsigned>::Create
       (val_data.c_str(),
@@ -144,6 +150,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
        "libsvm");
     lbfgs.SetValidation(true);
   }
+  // load model binary encode TODO : load model normal type
   inline void LoadModel(const char *fname) {
     Stream *fi = Stream::Create(fname, "r");
     std::string header; header.resize(4);
@@ -157,6 +164,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     }
     delete fi;
   }
+  // saveModel 
   inline void SaveModel(const char *fname,
                         const float *wptr,
                         bool save_base64 = false) {
@@ -165,6 +173,24 @@ class FmObjFunction : public solver::IObjFunction<float> {
     model.Save(fo, wptr);
     delete fo;
   }
+
+  // save model weight as readable
+  virtual void SaveModelWeight(const float *wptr, size_t num_iteration) {
+    std::ostringstream version;
+    version << num_iteration;
+    std::string modelversion = num_iteration == 0 ? this->model_out : this->model_out + "_V" + version.str();
+    rabit::TrackerPrintf("[SaveModelWeight@fm.cc]: save model: %s\n", modelversion.c_str());
+    dmlc::Stream *fo = dmlc::Stream::Create(modelversion.c_str(), "w");
+    dmlc::ostream os(fo);
+    size_t size = model.param.num_weight;
+    for(size_t i = 0;i < size; ++i) {
+      os << i << "\t" << *wptr << "\n";
+      wptr++;
+    }
+    os.set_stream(NULL);
+    delete fo;
+  } 
+
   virtual void InitNumDim(size_t &dim, size_t &size)  {
     if (model_in == "NULL") {
       size_t ndim = dtrain->NumCol();
