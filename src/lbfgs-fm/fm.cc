@@ -174,7 +174,7 @@ public:
   inline void SaveModel(const char *fname,
                         const float *wptr,
                         bool save_base64 = false) {
-    Stream *fo = Stream::Create(fname, "w");
+   Stream *fo = Stream::Create(fname, "w");
     //fo->Write("binf", 4);
     model.Save(fo, wptr);
     delete fo;
