@@ -153,14 +153,22 @@ struct FmModel {
     dmlc::istream is(fi);
     using namespace std;
     string line;
-    
+   
+    getline(is,line);
     getline(is,line);param.nfactor=atof(line.c_str());
+    getline(is,line); 
     getline(is,line);param.base_score=atof(line.c_str());
+    getline(is,line);
     getline(is,line);param.num_feature=atof(line.c_str());
+    getline(is,line); 
     getline(is,line);param.num_weight=atof(line.c_str());
+    getline(is,line); 
     getline(is,line);param.num_size=atof(line.c_str());
+    getline(is,line); 
     getline(is,line);param.num_size_val=atof(line.c_str());
+    getline(is,line); 
     getline(is,line);param.loss_type=stof(line.c_str());
+    getline(is,line); 
 
     if (weight == NULL) {
       weight = new float[param.num_weight];
@@ -178,13 +186,21 @@ struct FmModel {
     dmlc::ostream os(fo);
 
     //fo->Write(&param, sizeof(param));
+    os << "nfactor" << "\n";
     os << param.nfactor << "\n" ;
+    os << "base_score" << "\n";
     os << param.base_score << "\n" ;
+    os << "num_feature" << "\n";
     os << param.num_feature << "\n";
+    os << "num_weight" << "\n";
     os << param.num_weight << "\n" ;
+    os << "num_size" << "\n";
     os << param.num_size << "\n" ;
-    os << param.num_size_val << "\n" ;
-    os << param.loss_type << "\n" ;
+    os << "num_size_val" << "\n";
+    os << param.num_size_val << "\n";
+    os << "loss_type" << "\n";
+    os << param.loss_type << "\n";
+    os << "weight" << "\n";
 
     //save weight 
     if (wptr == NULL) wptr = weight;
