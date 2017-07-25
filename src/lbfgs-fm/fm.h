@@ -1,5 +1,6 @@
 #ifndef DMLC_LEARN_FM_H_
 #define DMLC_LEARN_FM_H_
+#include <string>
 #include <omp.h>
 #include <dmlc/data.h>
 #include "lbfgs.h"
@@ -67,8 +68,7 @@ struct FmModel {
           LOG(FATAL) << "unknown objective type " << val;
         }
       }
-    }
-    // transform margin to prediction
+    } // transform margin to prediction
     inline float MarginToPred(float margin) const {
       if (loss_type == 1) {
         return 1.0f / (1.0f + std::exp(-margin));
@@ -134,6 +134,7 @@ struct FmModel {
   ~FmModel(void) {
     if (weight != NULL) delete [] weight;
   }
+  /*
   // load model
   inline void Load(dmlc::Stream *fi) {
     fi->Read(&param, sizeof(param));
@@ -147,6 +148,54 @@ struct FmModel {
     if (wptr == NULL) wptr = weight;
     fo->Write(wptr, sizeof(float) * (param.num_weight));
   }
+  */
+  inline void Load(dmlc::Stream *fi) {
+    dmlc::istream is(fi);
+    using namespace std;
+    string line;
+    
+    getline(is,line);param.nfactor=atof(line.c_str());
+    getline(is,line);param.base_score=atof(line.c_str());
+    getline(is,line);param.num_feature=atof(line.c_str());
+    getline(is,line);param.num_weight=atof(line.c_str());
+    getline(is,line);param.num_size=atof(line.c_str());
+    getline(is,line);param.num_size_val=atof(line.c_str());
+    getline(is,line);param.loss_type=stof(line.c_str());
+
+    if (weight == NULL) {
+      weight = new float[param.num_weight];
+    }
+    
+    size_t count = 0; 
+    while(getline(is,line)){
+      weight[count] = atof(line.c_str());
+      ++count;
+    } 
+
+  std::cout << "load finish\n";
+  }
+  inline void Save(dmlc::Stream *fo, const float *wptr = NULL) {
+    dmlc::ostream os(fo);
+
+    //fo->Write(&param, sizeof(param));
+    os << param.nfactor << "\n" ;
+    os << param.base_score << "\n" ;
+    os << param.num_feature << "\n";
+    os << param.num_weight << "\n" ;
+    os << param.num_size << "\n" ;
+    os << param.num_size_val << "\n" ;
+    os << param.loss_type << "\n" ;
+
+    //save weight 
+    if (wptr == NULL) wptr = weight;
+    size_t size = param.num_weight;
+    for(size_t i = 0;i < size;++i){
+      os << *wptr << "\n";
+      wptr++;
+    }
+    //fo->Write(wptr, sizeof(float) * (param.num_weight));
+  }
+
   inline float Predict(const Row<unsigned> &v) const {
     return param.Predict(weight, v);
   }

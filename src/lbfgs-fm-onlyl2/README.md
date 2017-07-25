@@ -1,4 +1,5 @@
 Factorization Machine
+no bias mode!
 ====
 * input format: LibSVM
   - label[:weight] index[:value] index[:value] index[:value]

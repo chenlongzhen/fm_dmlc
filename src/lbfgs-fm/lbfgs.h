@@ -11,6 +11,8 @@
 #include <cmath>
 #include <limits>
 #include <rabit.h>
+#include <iostream>
+#include <string>
 #include <dmlc/logging.h>
 
 namespace dmlc {
@@ -52,6 +54,7 @@ class IObjFunction : public rabit::Serializable {
   virtual void CalcGrad(DType *out_grad,
                         const DType *weight,
                         size_t size) = 0;
+  virtual void SaveModelWeight(const DType *wptr, size_t num_iteration) = 0;
 };
 
 /*! \brief a basic version L-BFGS solver */
@@ -157,7 +160,7 @@ class LBFGSSolver {
       gstate.init_objval = gstate.old_objval;
       if (silent == 0 && rabit::GetRank() == 0) {
         rabit::TrackerPrintf
-            ("L-BFGS solver starts, num_dim=%lu, num_size=%lu, init_objval=%g, size_memory=%lu, RAM-approx=%lu\n",
+            ("[Init@lbfgs.h] L-BFGS solver starts, num_dim=%lu, num_size=%lu, init_objval=%g, size_memory=%lu, RAM-approx=%lu\n",
              gstate.num_dim, gstate.num_size, gstate.init_objval/gstate.num_size, gstate.size_memory,
              gstate.MemCost() + hist.MemCost());
       }
@@ -179,11 +182,13 @@ class LBFGSSolver {
   virtual bool UpdateOneIter(void) {
     bool stop = false;
     GlobalState &g = gstate;
+    // rabit::TrackerPrintf("[%d] calculate grad @ Rank %d..\n", gstate.num_iteration, rabit::GetRank());
     g.obj->CalcGrad(g.grad, g.weight, g.num_dim);
     rabit::Allreduce<rabit::op::Sum>(g.grad, g.num_dim);
     // find change direction
     double vdot = FindChangeDirection(g.tempw, g.grad, g.weight);
     // line-search, g.grad is now new weight
+    // rabit::TrackerPrintf("[%d] linear search @ Rank %d..\n", gstate.num_iteration, rabit::GetRank());
     int iter = BacktrackLineSearch(g.grad, g.tempw, g.weight, vdot);
     CHECK(iter < max_linesearch_iter) << "line search failed";
     // swap new weight 
@@ -235,13 +240,17 @@ class LBFGSSolver {
       }
     }
     gstate.old_objval = gstate.new_objval;
+    
+    if (gstate.num_iteration % 10 == 0 && rabit::GetRank() == 0 ) {
+      g.obj->SaveModelWeight(gstate.weight, gstate.num_iteration);
+    }
     rabit::CheckPoint(&gstate, &hist);
     return stop;
   }
   /*! \brief run optimization */
   virtual void Run(void) {
     this->Init();
-    rabit::TrackerPrintf("init ok");
+    rabit::TrackerPrintf("[Run@lbfgs.h] init ok @ %d\n", rabit::GetRank());
     while (gstate.num_iteration < static_cast<size_t>(max_lbfgs_iter)) {
       if (this->UpdateOneIter()) break;
     }
@@ -251,7 +260,7 @@ class LBFGSSolver {
         if (gstate.weight[i] != 0.0f) nonzero += 1;
       }
       rabit::TrackerPrintf
-          ("L-BFGS: finishes at iteration %d, %lu/%lu active weights\n",
+          ("[Run@lbfgs.h] L-BFGS: finishes at iteration %d, %lu/%lu active weights\n",
            gstate.num_iteration, nonzero, gstate.num_dim);
     }
   }

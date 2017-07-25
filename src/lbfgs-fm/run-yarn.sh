@@ -1,24 +1,15 @@
 #!/bin/bash
-if [ "$#" -lt 2 ];
-then
-	echo "Usage: <nworkers> <path_in_HDFS> [param=val]"
-	exit -1
-fi
+hadoop fs -rm -r -f /user/pengfei/tmp/dmlc/mushroom.fm.model
 
-
-# put the local training file to HDFS
-hadoop fs -rm -r -f $2/mushroom.fm.model
-
-hadoop fs -put ../data/agaricus.txt.train $2/data
-hadoop fs -put ../data/agaricus.txt.test $2/data
+hadoop fs -put ../data/agaricus.txt.train /user/pengfei/tmp/dmlc/data
+hadoop fs -put ../data/agaricus.txt.test /user/pengfei/tmp/dmlc/data
 
 # submit to hadoop
-../../dmlc-core/tracker/dmlc_yarn.py -q q_guanggao.q_adalg --ship-libcxx /data/home/guanggao/gcc-4.8.2/lib64  -n $1 --vcores 2 ./fm.dmlc data=hdfs://$2/data/agaricus.txt.train val_data=hdfs://$2/data/agaricus.txt.test model_out=hdfs://$2/mushroom.fm.model max_lbfgs_iter=50 nfactor=8 early_stop=10 "${*:3}"
-
+../../dmlc-core/tracker/dmlc_yarn.py -n 5 --vcores 1 -q q_guanggao.q_adalg --ship-libcxx /usr/local/lib64 ./fm.dmlc data=hdfs:///user/pengfei/tmp/dmlc/data/agaricus.txt.train val_data=hdfs:///user/pengfei/tmp/dmlc/data/agaricus.txt.test model_out=hdfs:///user/pengfei/tmp/dmlc/mushroom.fm.model max_lbfgs_iter=50 nfactor=8 early_stop=10 "${*:3}"
 
 
 # get the final model file
-hadoop fs -get $2/mushroom.fm.model ./fm.model
+hadoop fs -get /user/pengfei/tmp/dmlc/mushroom.fm.model ./fm.model
 
-../../dmlc-core/yarn/run_hdfs_prog.py ./fm.dmlc data=../data/agaricus.txt.test task=pred model_in=fm.model
-../../dmlc-core/yarn/run_hdfs_prog.py ./fm.dmlc task=dump model_in=fm.model name_dump=weight.txt
+#../../dmlc-core/yarn/run_hdfs_prog.py ./fm.dmlc data=../data/agaricus.txt.test task=pred model_in=fm.model
+#../../dmlc-core/yarn/run_hdfs_prog.py ./fm.dmlc task=dump model_in=fm.model name_dump=weight.txt

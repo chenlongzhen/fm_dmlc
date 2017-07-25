@@ -9,28 +9,24 @@
 #include <dmlc/data.h>
 #include <dmlc/logging.h>
 #include <random>
+#include <string>
 #include "./fm.h"
 
 namespace dmlc {
 namespace fm {
 class FmObjFunction : public solver::IObjFunction<float> {
- public:
-  // training threads
-  int nthread;
-  // L2 regularization
-  float reg_L2;
-  // L2 regularization for V
-  float reg_L2_V;
-  // fm_random
-  float fm_random;
-  // model
-  FmModel model;
-  // training data
-  dmlc::RowBlockIter<unsigned> *dtrain;
-  //validation data
-  dmlc::RowBlockIter<unsigned> *dval;
-  // solver
-  solver::LBFGSSolver<float> lbfgs;
+public:
+
+  // variables
+  int nthread;      // training threads
+  float reg_L2;     // L2 regularization
+  float reg_L2_V;   // L2 regularization for V
+  float fm_random;  // fm_random
+  FmModel model;    // model
+  dmlc::RowBlockIter<unsigned> *dtrain;   // training data
+  dmlc::RowBlockIter<unsigned> *dval;     // validation data
+  solver::LBFGSSolver<float> lbfgs;       // solver
+
   // constructor
   FmObjFunction() {
     lbfgs.SetObjFunction(this);
@@ -49,13 +45,14 @@ class FmObjFunction : public solver::IObjFunction<float> {
     name_dump = "dump.txt";
     model_out = "final.model";
   }
-  //destructor
+  // destructor
   virtual ~FmObjFunction(void) {
     if (dtrain != NULL)
       delete dtrain;
     if (dval != NULL)
       delete dval;
-  }  
+  }
+
   // set parameters
   inline void SetParam(const char *name, const char *val) {
     model.param.SetParam(name, val);
@@ -77,37 +74,41 @@ class FmObjFunction : public solver::IObjFunction<float> {
     if (!strcmp(name, "data")) data = val;
     if (!strcmp(name, "val_data")) val_data = val;
   }
-  //run
+
+  // run
   inline void Run(void) {
+    // create dtrain based on data
     if (data != "NULL") {
       dtrain = dmlc::RowBlockIter<unsigned>::Create
         (data.c_str(),
          rabit::GetRank(),
          rabit::GetWorldSize(),
          "libsvm");
-      }
+    }
+    // lodel model if exists
     if (model_in != "NULL") {
       this->LoadModel(model_in.c_str());
     }
+    // run based on task type
     if (task == "train") {
-      // Init validation data
+      // init validation data
       if (val_data != "NULL") {
         InitValidation();
       }
       lbfgs.Run();
       if (rabit::GetRank() == 0) {
-        this->SaveModel(model_out.c_str(), lbfgs.GetWeight());
-        this->SaveModelWeight(lbfgs.GetWeight(), 0);
+        rabit::TrackerPrintf("[Run@fm.cc] save model_out: %s\n", model_out.c_str());
+        this->SaveModel(model_out.c_str(),lbfgs.GetWeight());
+        //this->SaveModelWeight(lbfgs.GetWeight(), 0);
       }
     } else if (task == "pred") {
       this->TaskPred();
     } else if (task == "dump"){
       this->TaskDump(); 
     } else {
-      LOG(FATAL) << "unknown task" << task;
+      LOG(FATAL) << "[Run@fm.cc] unknown task: " << task;
     }
   }
-  //predict task
   inline void TaskPred(void) {
     CHECK(model_in != "NULL") << "must set model_in for task=pred";
     dmlc::Stream *fo = dmlc::Stream::Create(name_pred.c_str(), "w");
@@ -122,9 +123,8 @@ class FmObjFunction : public solver::IObjFunction<float> {
     // make sure os push to the output stream, before delete
     os.set_stream(NULL);
     delete fo;
-    printf("Finishing writing to %s\n", name_pred.c_str());
+    rabit::TrackerPrintf("[TaskPred@fm.cc] finish writing to: %s\n", name_pred.c_str());
   }
-  //dump task, dump weight nice mode 
   inline void TaskDump(void) {
     CHECK(model_in != "NULL") << "must set model_in for task=dump";
     dmlc::Stream *fo = dmlc::Stream::Create(name_dump.c_str(), "w");
@@ -139,9 +139,10 @@ class FmObjFunction : public solver::IObjFunction<float> {
     os << "bias" << '\t' << model.weight[model.param.num_weight - 1] << '\n';
     os.set_stream(NULL);
     delete fo;
-    printf("Finishing dumping to %s\n", name_dump.c_str());
+    rabit::TrackerPrintf("[TaskDump@fm.cc] finish dumping to %s\n", name_dump.c_str());
   }
-  // set validation 
+
+  // init validation data
   inline void InitValidation(void){
     dval = dmlc::RowBlockIter<unsigned>::Create
       (val_data.c_str(),
@@ -150,9 +151,11 @@ class FmObjFunction : public solver::IObjFunction<float> {
        "libsvm");
     lbfgs.SetValidation(true);
   }
-  // load model binary encode TODO : load model normal type
+
+  // load model
   inline void LoadModel(const char *fname) {
     Stream *fi = Stream::Create(fname, "r");
+    /*
     std::string header; header.resize(4);
     // check header for different binary encode
     CHECK(fi->Read(&header[0], 4) != 0) << "invalid model";
@@ -162,14 +165,17 @@ class FmObjFunction : public solver::IObjFunction<float> {
     } else {
       LOG(FATAL) << "invalid model file";
     }
+    */
+    model.Load(fi);
     delete fi;
   }
-  // saveModel 
+
+  // save model
   inline void SaveModel(const char *fname,
                         const float *wptr,
                         bool save_base64 = false) {
     Stream *fo = Stream::Create(fname, "w");
-    fo->Write("binf", 4);
+    //fo->Write("binf", 4);
     model.Save(fo, wptr);
     delete fo;
   }
@@ -186,31 +192,42 @@ class FmObjFunction : public solver::IObjFunction<float> {
     for(size_t i = 0;i < size; ++i) {
       os << i << "\t" << *wptr << "\n";
       wptr++;
-    }
+    }	
     os.set_stream(NULL);
     delete fo;
-  } 
+  }
 
   virtual void InitNumDim(size_t &dim, size_t &size)  {
     if (model_in == "NULL") {
       size_t ndim = dtrain->NumCol();
       size_t nsize = (dtrain->Value()).size;
+      rabit::TrackerPrintf("[InitNumDim@fm.cc] @node[%d] train sample num: %d\n", rabit::GetRank(), nsize);
+      // ndim is the max #column of each reducer
       rabit::Allreduce<rabit::op::Max>(&ndim, 1);
+      // nsize is the sum of samples of each reducer
       rabit::Allreduce<rabit::op::Sum>(&nsize, 1);
       model.param.num_feature = std::max(ndim, model.param.num_feature);
       model.param.num_size = nsize;
+      rabit::TrackerPrintf("[InitNumDim@fm.cc] single feature num max: %d\n", model.param.num_feature);
+      rabit::TrackerPrintf("[InitNumDim@fm.cc] train sample num total: %ld\n", model.param.num_size);
       if (val_data != "NULL") {
+        // no need of ndim_val: equal to ndim, ignore other columns
         size_t nsize_val = (dval->Value()).size;
         rabit::Allreduce<rabit::op::Sum>(&nsize_val, 1);
         model.param.num_size_val = nsize_val;
+        rabit::TrackerPrintf("[InitNumDim@fm.cc] validation sample num total: %ld\n", model.param.num_size_val);
       }
     }
+    // total #weights: #feature * nfactor + #bias
     dim = model.param.num_weight = model.param.num_feature * (model.param.nfactor + 1) + 1;
     size = model.param.num_size;
   }
+
+  // init model
   virtual void InitModel(float *weight, size_t size) {
     if (model_in == "NULL") {
       if(rabit::GetRank() == 0){
+        // init weight with normal distribution (0,1) * fm_random
         std::default_random_engine generator;
         std::normal_distribution<float> distribution(0.0,1.0);
         for(size_t i = 0; i < size; ++i) {
@@ -220,22 +237,27 @@ class FmObjFunction : public solver::IObjFunction<float> {
       //memset(weight, 0.0f, size * sizeof(float));
       model.param.InitBaseScore();
     } else {
+      // set 0 if model_in exists
       rabit::Broadcast(model.weight, size * sizeof(float), 0);
       memcpy(weight, model.weight, size * sizeof(float));
     }
   }
+
   // load model
   virtual void Load(rabit::Stream *fi) {
     fi->Read(&model.param, sizeof(model.param));
   }
+  // save model
   virtual void Save(rabit::Stream *fo) const {
     fo->Write(&model.param, sizeof(model.param));
   }
 
+  // evaluation loss
   virtual double Eval(const float *weight, size_t size, bool validation) {
     if (nthread != 0) omp_set_num_threads(nthread);
     CHECK(size == model.param.num_weight);
     double sum_val = 0.0;
+
     if(validation){
       dval->BeforeFirst();
       while (dval->Next()) {
@@ -250,17 +272,20 @@ class FmObjFunction : public solver::IObjFunction<float> {
       CHECK(!std::isnan(sum_val)) << "nan occurs";
       return sum_val/model.param.num_size_val;
     }
+
     dtrain->BeforeFirst();
     while (dtrain->Next()) {
       const RowBlock<unsigned> &batch = dtrain->Value();
       #pragma omp parallel for schedule(static) reduction(+:sum_val)
       for (size_t i = 0; i < batch.size; ++i) {
         float py = model.param.PredictMargin(weight, batch[i]);
+        // calculate (weighted) loss
         float fv = model.param.MarginToLoss(batch[i].label, py) * batch[i].weight;
         sum_val += fv;
       }
     }
 
+    // calculate regularization loss
     if (rabit::GetRank() == 0) {
       // only add L2 regularization once
       if (reg_L2 != 0.0f) {
@@ -281,6 +306,8 @@ class FmObjFunction : public solver::IObjFunction<float> {
     CHECK(!std::isnan(sum_val)) << "nan occurs";
     return sum_val;
   }
+
+  // calculate gradient
   virtual void CalcGrad(float *out_grad,
                         const float *weight,
                         size_t size) {
@@ -288,6 +315,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     CHECK(size == model.param.num_weight) << "size consistency check";
     memset(out_grad, 0.0f, sizeof(float) * size);
     double sum_gbias = 0.0;
+
     dtrain->BeforeFirst();    
     while (dtrain->Next()) {
       const RowBlock<unsigned> &batch = dtrain->Value();
@@ -301,20 +329,20 @@ class FmObjFunction : public solver::IObjFunction<float> {
         float grad = model.param.PredToGrad(v.label, py) * v.weight;
         //add bias
         sum_gbias += grad;
-        // single feature grad 
+        // single feature grad (w)
         for (index_t j = 0; j < v.length; ++j) {
           tmp_out_grad[thread_id][v.index[j]] += v.get_value(j) * grad;
         }
-        // interation features grad
+        // interation features grad (v)
         for(int i = 0; i < model.param.nfactor; ++i) {
           double sumxf = 0.0;
           for(index_t j = 0; j < v.length; ++j){
-            int n = model.param.num_feature   + v.index[j] * model.param.nfactor + i;
+            int n = model.param.num_feature + v.index[j] * model.param.nfactor + i;
             sumxf += weight[n] * v.get_value(j);
           }
-          for(index_t j=0; j < v.length; ++j) {
-            int n = model.param.num_feature   + v.index[j] * model.param.nfactor + i;
-            tmp_out_grad[thread_id][n] += v.get_value(j)  * (sumxf - weight[n] * v.get_value(j)) * grad;
+          for(index_t j = 0; j < v.length; ++j) {
+            int n = model.param.num_feature + v.index[j] * model.param.nfactor + i;
+            tmp_out_grad[thread_id][n] += v.get_value(j) * (sumxf - weight[n] * v.get_value(j)) * grad;
           }
         }
       }
@@ -342,7 +370,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
     }
   }
     
- private:
+private:
   std::string task;
   std::string model_in;
   std::string model_out;
@@ -351,6 +379,7 @@ class FmObjFunction : public solver::IObjFunction<float> {
   std::string data;
   std::string val_data;
 };
+
 }  // namespace fm
 }  // namespace dmlc
 
@@ -366,12 +395,14 @@ int main(int argc, char *argv[]) {
   }
   rabit::Init(argc, argv);
   dmlc::fm::FmObjFunction *fm = new dmlc::fm::FmObjFunction();
+  rabit::TrackerPrintf("[main@fm.cc] setting up parameters @ Rank %d..\n", rabit::GetRank());
   for (int i = 1; i < argc; ++i) {
     char name[256], val[256];
     if (sscanf(argv[i], "%[^=]=%s", name, val) == 2) {
       fm->SetParam(name, val);
     }
   }
+  rabit::TrackerPrintf("[main@fm.cc] ready to run model @ Rank %d..\n", rabit::GetRank());
   fm->Run();
   delete fm;
   rabit::Finalize();
