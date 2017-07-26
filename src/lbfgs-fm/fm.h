@@ -209,6 +209,7 @@ struct FmModel {
       os << *wptr << "\n";
       wptr++;
     }
+    os.set_stream(NULL)
     //fo->Write(wptr, sizeof(float) * (param.num_weight));
   }
 
